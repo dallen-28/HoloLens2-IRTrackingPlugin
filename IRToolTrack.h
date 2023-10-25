@@ -40,6 +40,7 @@ public:
 	inline bool IsTracking() { return m_bIsCurrentlyTracking; }
 
 	cv::Mat GetToolTransform(std::string identifier);
+	cv::Mat GetDepthToWorldTransform();
 	void TrackTools();
 
 
@@ -82,6 +83,8 @@ private:
 
 	winrt::HL2IRToolTracking::implementation::HL2IRTracking* m_pResearchMode;
 
+
+	cv::Mat depthToWorldPose = cv::Mat(4,4,CV_32F);
 	
 
 	//Crude way of doing uniqueness checks, I dont like it but oh well

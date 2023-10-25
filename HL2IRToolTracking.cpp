@@ -54,6 +54,8 @@ namespace winrt::HL2IRToolTracking::implementation
             }
         }
 
+        this->m_depthToWorldPose = new float[7];
+
         // get spatial locator of rigNode
         GUID guid;
         IResearchModeSensorDevicePerception* pSensorDevicePerception;
@@ -248,6 +250,8 @@ namespace winrt::HL2IRToolTracking::implementation
                 winrt::Windows::Foundation::Numerics::float4x4 depthToWorld_float4x4;
                 XMStoreFloat4x4(&depthToWorld_float4x4, depthToWorld);
 
+
+
                 std::vector<float> floatContainer(12);
                 auto pFloatContainer = floatContainer.data();
                 if (transToWorld)
@@ -312,6 +316,8 @@ namespace winrt::HL2IRToolTracking::implementation
                     pHL2IRTracking->m_LUTGenerated_short = true;
                 }
 
+                
+      
 
                 // ------------------------------- Tool tracking start -------------------------------
                 std::vector<float> irToolCenters;
@@ -319,6 +325,45 @@ namespace winrt::HL2IRToolTracking::implementation
                 {
 
                     cv::Mat transform_matrix = cv::Mat(4, 4, CV_32F, &depthToWorld_float4x4).t();
+                    //cv::Mat transform_matrix = cv::Mat(4, 4, CV_32F, &depthToWorld_float4x4);
+                   
+                    // Set to identity for testing
+                    //cv::Mat transform_matrix2 = cv::Mat::eye(4, 4, CV_32F);
+                    cv::Mat transform_matrix2 = transform_matrix;
+
+          
+                    //Create Quaternion
+                    cv::Vec4f quat;
+                    quat[3] = cv::sqrt(cv::max(0.f, 1.f + transform_matrix2.at<float>(0, 0) + transform_matrix2.at<float>(1, 1) + transform_matrix2.at<float>(2, 2))) / 2.f;
+                    quat[0] = cv::sqrt(cv::max(0.f, 1.f + transform_matrix2.at<float>(0, 0) - transform_matrix2.at<float>(1, 1) - transform_matrix2.at<float>(2, 2))) / 2.f;
+                    quat[1] = cv::sqrt(cv::max(0.f, 1.f - transform_matrix2.at<float>(0, 0) + transform_matrix2.at<float>(1, 1) - transform_matrix2.at<float>(2, 2))) / 2.f;
+                    quat[2] = cv::sqrt(cv::max(0.f, 1.f - transform_matrix2.at<float>(0, 0) - transform_matrix2.at<float>(1, 1) + transform_matrix2.at<float>(2, 2))) / 2.f;
+                    quat[0] *= (quat[0] * (transform_matrix2.at<float>(2, 1) - transform_matrix2.at<float>(1, 2))) >= 0.f ? 1.f : -1.f;
+                    quat[1] *= (quat[1] * (transform_matrix2.at<float>(0, 2) - transform_matrix2.at<float>(2, 0))) >= 0.f ? 1.f : -1.f;
+                    quat[2] *= (quat[2] * (transform_matrix2.at<float>(1, 0) - transform_matrix2.at<float>(0, 1))) >= 0.f ? 1.f : -1.f;
+
+                    // Set position
+                    pHL2IRTracking->m_depthToWorldPose[0] = transform_matrix2.at<float>(0, 3);
+                    pHL2IRTracking->m_depthToWorldPose[1] = transform_matrix2.at<float>(1, 3);
+                    pHL2IRTracking->m_depthToWorldPose[2] = transform_matrix2.at<float>(2, 3);
+
+                    std::string funcoutput = "Depth To World Position: (" + std::to_string(pHL2IRTracking->m_depthToWorldPose[0]) + ", "
+                        + std::to_string(pHL2IRTracking->m_depthToWorldPose[1]) + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[2]) + ")\n";
+                    OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
+
+                    // Set Orientation
+                    pHL2IRTracking->m_depthToWorldPose[3] = quat[0];
+                    pHL2IRTracking->m_depthToWorldPose[4] = quat[1];
+                    pHL2IRTracking->m_depthToWorldPose[5] = quat[2];
+                    pHL2IRTracking->m_depthToWorldPose[6] = quat[3];
+
+
+                    funcoutput = "Depth To World Orientation: (" + std::to_string(pHL2IRTracking->m_depthToWorldPose[3]) + ", "
+                        + std::to_string(pHL2IRTracking->m_depthToWorldPose[4]) + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[5]) 
+                        + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[6]) + ")\n";
+                    OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
                     pHL2IRTracking->m_IRToolTracker->AddFrame((void*)pAbImage, (void*)pDepth, resolution.Width, resolution.Height, transform_matrix, pHL2IRTracking->m_latestShortDepthTimestamp);
                     pHL2IRTracking->m_latestTrackedFrame = pHL2IRTracking->m_latestShortDepthTimestamp;
 
@@ -526,6 +571,62 @@ namespace winrt::HL2IRToolTracking::implementation
         com_array<float> tempBuffer = com_array<float>(array.begin(), array.end());
         return tempBuffer;
     }
+
+    float* HL2IRTracking::EncodeXMFloat4x4(XMFLOAT4X4 mat)
+    {
+        //Create Quaternion
+        float quat[4];
+        quat[3] = cv::sqrt(cv::max(0.f, 1.f + mat._11 + mat._22 + mat._33)) / 2.f;
+        quat[0] = cv::sqrt(cv::max(0.f, 1.f + mat._11 - mat._22 - mat._33)) / 2.f;
+        quat[1] = cv::sqrt(cv::max(0.f, 1.f - mat._11 + mat._22 - mat._33)) / 2.f;
+        quat[2] = cv::sqrt(cv::max(0.f, 1.f - mat._11 - mat._22 + mat._33)) / 2.f;
+        quat[0] *= (quat[0] * (mat._32 - mat._23)) >= 0.f ? 1.f : -1.f;
+        quat[1] *= (quat[1] * (mat._13 - mat._31)) >= 0.f ? 1.f : -1.f;
+        quat[2] *= (quat[2] * (mat._21 - mat._12)) >= 0.f ? 1.f : -1.f;
+
+
+        float depthToWorldPose[7];
+
+        depthToWorldPose[0] = mat._14;
+        depthToWorldPose[1] = mat._24;
+        depthToWorldPose[2] = mat._34;
+        depthToWorldPose[3] = quat[0];
+        depthToWorldPose[4] = quat[1];
+        depthToWorldPose[5] = quat[2];
+        depthToWorldPose[6] = quat[3];
+
+        return depthToWorldPose;
+    }
+
+    com_array<float> HL2IRTracking::GetDepthToWorldTransform()
+    {
+
+        com_array<float> pose = com_array<float>(std::move_iterator(m_depthToWorldPose), std::move_iterator(m_depthToWorldPose + 7));
+
+        // might need to concatentate with rigidnodepose 
+        return pose;
+
+     /*   if (m_IRToolTracker == nullptr)
+            return com_array<float>(8, 0);
+
+        cv::Mat transform = m_IRToolTracker->GetDepthToWorldTransform();
+        std::vector<float> array;
+        if (transform.isContinuous()) {
+            array.assign((float*)transform.data, (float*)transform.data + transform.total() * transform.channels());
+        }
+        else {
+            for (int i = 0; i < transform.rows; ++i) {
+                array.insert(array.end(), transform.ptr<float>(i), transform.ptr<float>(i) + transform.cols * transform.channels());
+            }
+        }
+        com_array<float> tempBuffer = com_array<float>(array.begin(), array.end());
+        return tempBuffer;*/
+
+
+
+
+    }
+
 
     INT64 HL2IRTracking::GetTrackingTimestamp()
     {

@@ -20,6 +20,7 @@ namespace HL2IRToolTracking
 
 
         Single[] GetToolTransform(String identifier);
+        Single[] GetDepthToWorldTransform();
         Int64 GetTrackingTimestamp();
 
     }

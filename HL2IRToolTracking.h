@@ -65,6 +65,7 @@ namespace winrt::HL2IRToolTracking::implementation
 
         void SetReferenceCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem refCoord);
 
+
         INT64 GetPVTimestamp();
         INT64 GetLongDepthTimestamp();
         INT64 GetShortDepthTimestamp();
@@ -86,6 +87,7 @@ namespace winrt::HL2IRToolTracking::implementation
         bool StartToolTracking();
         void StopToolTracking();
         com_array<float> GetToolTransform(hstring identifier);
+        com_array<float> GetDepthToWorldTransform();
         INT64 GetTrackingTimestamp();
 
         bool DepthMapImagePointToCameraUnitPlane(float (&uv)[2], float (&xy)[2]);
@@ -94,6 +96,7 @@ namespace winrt::HL2IRToolTracking::implementation
         float* m_lut_short = nullptr;
         int m_lutLength_short = 0;
 
+        float* m_depthToWorldPose = nullptr;
 
         IResearchModeSensor* m_depthSensor = nullptr;
         IResearchModeCameraSensor* m_pDepthCameraSensor = nullptr;
@@ -125,6 +128,8 @@ namespace winrt::HL2IRToolTracking::implementation
         std::string MatrixToString(DirectX::XMFLOAT4X4 mat);
         static DirectX::XMMATRIX HL2IRTracking::SpatialLocationToDxMatrix(Windows::Perception::Spatial::SpatialLocation location);
         
+        float* EncodeXMFloat4x4(DirectX::XMFLOAT4X4 mat);
+
         DirectX::XMFLOAT4X4 m_depthCameraPose;
         DirectX::XMMATRIX m_depthCameraPoseInvMatrix;
         DirectX::XMFLOAT4X4 m_LFCameraPose;

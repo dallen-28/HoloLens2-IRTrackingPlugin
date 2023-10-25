@@ -25,7 +25,31 @@ cv::Mat IRToolTracker::GetToolTransform(std::string identifier)
 	int index = it->second;
 
 	cv::Mat transform = m_Tools.at(index).cur_transform;
+
+
+
+
 	return transform;
+}
+
+cv::Mat IRToolTracker::GetDepthToWorldTransform()
+{
+	//std::string funcoutput = "Getting Depth To World pose:\n";
+	//OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
+	/*if (th == nullptr)
+	{
+		std::string funcoutput = "Current frame is null\n";
+		OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+		return cv::Mat::zeros(4, 4, CV_32F);
+	}*/
+
+
+	//funcoutput = "XPOS:" + std::to_string(depthToWorldPose.at<double>(0,3)) + "\n";
+	//OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+	return this->depthToWorldPose;
+	
+	
 }
 
 void IRToolTracker::TrackTools()
@@ -389,10 +413,22 @@ cv::Mat IRToolTracker::MatchPointsKabsch(IRTrackedTool tool, ProcessedAHATFrame 
 	cv::Mat3f frame_spheres_xyz = it_spheres_xyz->second;
 
 	cv::Mat hololens_pose_mm = frame.hololens_pose.clone();
+	
+	// Store hololens pose
+	//depthToWorldPose = hololens_pose_mm;
+
+	//std::string funcoutput = "Depth To World X Pos:" + std::to_string(depthToWorldPose.at<float>(0,3)) + "\n";
+	//OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
+
+
+	// For returning the pose of tool with respect to camera, just set hololens pose to identity
+	hololens_pose_mm = cv::Mat::eye(4, 4, CV_32F);
 
 	hololens_pose_mm.at<float>(0, 3) = hololens_pose_mm.at<float>(0, 3) * 1000.f;
 	hololens_pose_mm.at<float>(1, 3) = hololens_pose_mm.at<float>(1, 3) * 1000.f;
 	hololens_pose_mm.at<float>(2, 3) = hololens_pose_mm.at<float>(2, 3) * 1000.f;
+
 
 	int tool_node_id = 0;
 	for (int i = 0; i < num_points; i++) {
@@ -494,7 +530,12 @@ cv::Mat IRToolTracker::MatchPointsKabsch(IRTrackedTool tool, ProcessedAHATFrame 
 	transform_matrix.at<float>(2, 3) = t.at<float>(2, 0) / 1000.f;
 	transform_matrix.at<float>(3, 3) = 1.f;
 
-	transform_matrix = FlipTransformRightLeft(transform_matrix);
+	// Concatenate at end instead for testing
+	//transform_matrix = hololens_pose_mm2 * transform_matrix;
+
+	// Concatenate in unity and flip transform afterwards
+
+	//transform_matrix = FlipTransformRightLeft(transform_matrix);
 
 	//Copy translation and convert mm to m
 	cv::Vec3f position;
