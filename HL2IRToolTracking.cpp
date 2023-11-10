@@ -239,6 +239,7 @@ namespace winrt::HL2IRToolTracking::implementation
                 pHL2IRTracking->m_latestShortDepthTimestamp = ts.TargetTime().time_since_epoch().count();
 
                 XMMATRIX depthToWorld = pHL2IRTracking->m_depthCameraPoseInvMatrix * SpatialLocationToDxMatrix(transToWorld);
+                //XMMATRIX depthToWorld = SpatialLocationToDxMatrix(transToWorld);
 
                 pHL2IRTracking->mu.lock();
                 auto roiCenterFloat = XMFLOAT3(pHL2IRTracking->m_roiCenter[0], pHL2IRTracking->m_roiCenter[1], pHL2IRTracking->m_roiCenter[2]);
@@ -602,6 +603,10 @@ namespace winrt::HL2IRToolTracking::implementation
     {
 
         com_array<float> pose = com_array<float>(std::move_iterator(m_depthToWorldPose), std::move_iterator(m_depthToWorldPose + 7));
+
+        //std::string funcoutput = "Depth To World Position: (" + std::to_string(pose[0]) + ", "
+        //    + std::to_string(pose[1]) + ", " + std::to_string(pose[2]) + ")\n";
+        //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
 
         // might need to concatentate with rigidnodepose 
         return pose;
