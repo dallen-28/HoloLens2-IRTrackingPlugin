@@ -1,14 +1,16 @@
 #include "IRToolTrack.h"
 #include "HL2IRToolTracking.h"
 
+#include "opencv2/highgui.hpp"
+
 #define DEBUG_OUTPUT FALSE
 #define DEBUG_TIME FALSE
 #define DEBUG_NO_FILTER FALSE
 #define DEBUG_OUTPUT_OCCL FALSE
 
 
-#define DISABLE_LOWPASS FALSE
-#define DISABLE_KALMAN FALSE
+#define DISABLE_LOWPASS TRUE
+#define DISABLE_KALMAN TRUE
 
 
 
@@ -96,6 +98,7 @@ void IRToolTracker::TrackTools()
 			//tool_track_threads.at(i) = std::thread(&IRToolTracker::TrackTool, this, tool, processedFrame, result);
 			TrackTool(tool, processedFrame, result);
 			raw_results[i] = result;
+
 			//ProcessEnvFrame(processedFrame, result);
 		}
 
@@ -715,8 +718,11 @@ bool IRToolTracker::ProcessFrame(AHATFrame* rawFrame, ProcessedAHATFrame &result
 	
 	rawFrame->cvAbImage.convertTo(rawFrame->cvAbImage, CV_8UC1);
 
-	int areaCount = cv::connectedComponentsWithStats(rawFrame->cvAbImage, labels, stats, centroids, 8);
 
+	//cv::imshow("TEST", rawFrame->cvAbImage);
+
+	int areaCount = cv::connectedComponentsWithStats(rawFrame->cvAbImage, labels, stats, centroids, 8);
+	
 
 	for (int i = 1; i < areaCount; ++i)
 	{

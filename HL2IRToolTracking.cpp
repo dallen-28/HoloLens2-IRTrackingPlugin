@@ -5,6 +5,7 @@
 #include "IRToolTrack.h"
 
 #include <winrt/Windows.Foundation.Collections.h>
+#include "opencv2/highgui.hpp"
 
 
 extern "C"
@@ -224,8 +225,14 @@ namespace winrt::HL2IRToolTracking::implementation
                 const UINT16* pAbImage = nullptr;
                 pDepthFrame->GetAbDepthBuffer(&pAbImage, &outAbBufferCount);
 
+         
+                
+                
+
                 auto pDepthTexture = std::make_unique<uint8_t[]>(outBufferCount);
+                auto pAbTexture = std::make_unique<uint8_t[]>(outAbBufferCount);
                 std::vector<float> pointCloud;
+
 
 
                 // get tracking transform
@@ -308,6 +315,15 @@ namespace winrt::HL2IRToolTracking::implementation
                             *pLutTable++ = xy[0];
                             *pLutTable++ = xy[1];
                             *pLutTable++ = z;
+
+                            // save AbImage as grayscale texture pixel into temp buffer
+                            auto idx = resolution.Width * y + x;
+                            UINT16 abValue = pAbImage[idx];
+                            uint8_t processedAbValue = 0;
+                            if (abValue > 1000) { processedAbValue = 0xFF; }
+                            else { processedAbValue = (uint8_t)((float)abValue / 1000 * 255); }
+                            pAbTexture.get()[idx] = processedAbValue;
+
                         }
                     }
                     OutputDebugString(L"Create Space for lut...\n");
@@ -318,7 +334,15 @@ namespace winrt::HL2IRToolTracking::implementation
                 }
 
                 
-      
+                // save pre-processed AbImage texture (for visualization)
+                if (!pHL2IRTracking->m_shortAbImageTexture)
+                {
+                    OutputDebugString(L"Create Space for short AbImage texture...\n");
+                    pHL2IRTracking->m_shortAbImageTexture = new UINT8[outBufferCount];
+                }
+                memcpy(pHL2IRTracking->m_shortAbImageTexture, pAbTexture.get(), outBufferCount * sizeof(UINT8));
+                pHL2IRTracking->m_shortAbImageTextureUpdated = true;
+                
 
                 // ------------------------------- Tool tracking start -------------------------------
                 std::vector<float> irToolCenters;
@@ -350,7 +374,7 @@ namespace winrt::HL2IRToolTracking::implementation
 
                     std::string funcoutput = "Depth To World Position: (" + std::to_string(pHL2IRTracking->m_depthToWorldPose[0]) + ", "
                         + std::to_string(pHL2IRTracking->m_depthToWorldPose[1]) + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[2]) + ")\n";
-                    OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+                    //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
 
 
                     // Set Orientation
@@ -363,7 +387,7 @@ namespace winrt::HL2IRToolTracking::implementation
                     funcoutput = "Depth To World Orientation: (" + std::to_string(pHL2IRTracking->m_depthToWorldPose[3]) + ", "
                         + std::to_string(pHL2IRTracking->m_depthToWorldPose[4]) + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[5]) 
                         + ", " + std::to_string(pHL2IRTracking->m_depthToWorldPose[6]) + ")\n";
-                    OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+                    //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
 
                     pHL2IRTracking->m_IRToolTracker->AddFrame((void*)pAbImage, (void*)pDepth, resolution.Width, resolution.Height, transform_matrix, pHL2IRTracking->m_latestShortDepthTimestamp);
                     pHL2IRTracking->m_latestTrackedFrame = pHL2IRTracking->m_latestShortDepthTimestamp;
@@ -417,6 +441,7 @@ namespace winrt::HL2IRToolTracking::implementation
 
     inline bool HL2IRTracking::ShortThrowLUTUpdated() { return m_LUTGenerated_short; }
 
+    inline bool HL2IRTracking::ShortAbImageTextureUpdated() { return m_shortAbImageTextureUpdated; }
 
     hstring HL2IRTracking::PrintDepthResolution()
     {
@@ -602,34 +627,24 @@ namespace winrt::HL2IRToolTracking::implementation
     com_array<float> HL2IRTracking::GetDepthToWorldTransform()
     {
 
-        com_array<float> pose = com_array<float>(std::move_iterator(m_depthToWorldPose), std::move_iterator(m_depthToWorldPose + 7));
-
-        //std::string funcoutput = "Depth To World Position: (" + std::to_string(pose[0]) + ", "
-        //    + std::to_string(pose[1]) + ", " + std::to_string(pose[2]) + ")\n";
-        //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
-
-        // might need to concatentate with rigidnodepose 
+        com_array<float> pose = com_array<float>(std::move_iterator(m_depthToWorldPose), std::move_iterator(m_depthToWorldPose + 7)); 
         return pose;
 
-     /*   if (m_IRToolTracker == nullptr)
-            return com_array<float>(8, 0);
+    }
 
-        cv::Mat transform = m_IRToolTracker->GetDepthToWorldTransform();
-        std::vector<float> array;
-        if (transform.isContinuous()) {
-            array.assign((float*)transform.data, (float*)transform.data + transform.total() * transform.channels());
+    // Get depth map texture buffer. (For visualization purpose)
+    com_array<uint8_t> HL2IRTracking::GetShortAbImageTextureBuffer()
+    {
+        std::unique_lock<std::shared_mutex> l(mu);
+        
+        if (!m_shortAbImageTexture)
+        {
+            return com_array<UINT8>();
         }
-        else {
-            for (int i = 0; i < transform.rows; ++i) {
-                array.insert(array.end(), transform.ptr<float>(i), transform.ptr<float>(i) + transform.cols * transform.channels());
-            }
-        }
-        com_array<float> tempBuffer = com_array<float>(array.begin(), array.end());
-        return tempBuffer;*/
+        com_array<UINT8> tempBuffer = com_array<UINT8>(std::move_iterator(m_shortAbImageTexture), std::move_iterator(m_shortAbImageTexture + m_depthBufferSize));
 
-
-
-
+        m_shortAbImageTextureUpdated = false;
+        return tempBuffer;
     }
 
 

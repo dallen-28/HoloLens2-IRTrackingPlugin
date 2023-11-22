@@ -88,8 +88,9 @@ namespace winrt::HL2IRToolTracking::implementation
         void StopToolTracking();
         com_array<float> GetToolTransform(hstring identifier);
         com_array<float> GetDepthToWorldTransform();
+        com_array<uint8_t> GetShortAbImageTextureBuffer();
         INT64 GetTrackingTimestamp();
-
+        bool ShortAbImageTextureUpdated();
         bool DepthMapImagePointToCameraUnitPlane(float (&uv)[2], float (&xy)[2]);
 
     private:
@@ -97,6 +98,8 @@ namespace winrt::HL2IRToolTracking::implementation
         int m_lutLength_short = 0;
 
         float* m_depthToWorldPose = nullptr;
+        UINT8* m_shortAbImageTexture = nullptr;
+        std::atomic_bool m_shortAbImageTextureUpdated = false;
 
         IResearchModeSensor* m_depthSensor = nullptr;
         IResearchModeCameraSensor* m_pDepthCameraSensor = nullptr;
