@@ -3,7 +3,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using Unity.VisualScripting;
+using System.Linq;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -11,6 +12,8 @@ namespace IRToolTrack
 {
     public class IRToolController : MonoBehaviour
     {
+
+        public GameObject StylusToDepth;
         
         public string identifier;
         public GameObject[] spheres;
@@ -39,10 +42,12 @@ namespace IRToolTrack
 
         public float[] sphere_positions
         {
-            get {
-                float[] coordinates = new float[sphere_count*3];
+            get
+            {
+                float[] coordinates = new float[sphere_count * 3];
                 int cur_coord = 0;
-                for (int i = 0; i< sphere_count; i++) {
+                for (int i = 0; i < sphere_count; i++)
+                {
                     coordinates[cur_coord] = spheres[i].transform.localPosition.x;
                     coordinates[cur_coord + 1] = spheres[i].transform.localPosition.y;
                     coordinates[cur_coord + 2] = spheres[i].transform.localPosition.z;
@@ -74,12 +79,6 @@ namespace IRToolTrack
 #endif
         }
 
-        bool LoadROMFile(string romFilePath)
-        {
-            var romFile = Resources.Load(romFilePath);
-            return false;
-        }
-
         public enum Status
         {
             Inactive,
@@ -95,7 +94,7 @@ namespace IRToolTrack
                 return;
             }
             //_listener.Start();
-            Debug.Log("Started tracking "+identifier);
+            Debug.Log("Started tracking " + identifier);
             _subStatus = Status.Active;
         }
 
@@ -103,7 +102,7 @@ namespace IRToolTrack
         {
             if (_subStatus == Status.Inactive)
             {
-                Debug.Log("Tracking of "+identifier+" already stopped.");
+                Debug.Log("Tracking of " + identifier + " already stopped.");
                 return;
             }
             //_listener.Stop();
@@ -117,7 +116,9 @@ namespace IRToolTrack
                 return;
             Int64 trackingTimestamp = irToolTracking.GetTimestamp();
             float[] tool_transform = irToolTracking.GetToolTransform(identifier);
-            if (tool_transform != null && tool_transform[0]!= float.NaN && tool_transform[7]!=0 && lastUpdate<trackingTimestamp)
+
+
+            if (tool_transform != null && tool_transform[0] != float.NaN && tool_transform[7] != 0 && lastUpdate < trackingTimestamp)
             {
                 if (!childrenActive)
                 {
@@ -137,7 +138,7 @@ namespace IRToolTrack
                 targetPosition = new Vector3(tool_transform[0], tool_transform[1], tool_transform[2]);
                 lastSpotted = Time.time;
             }
-            else if (childrenActive && disableWhenTrackingLost && Time.time-lastSpotted>secondsLostUntilDisable)
+            else if (childrenActive && disableWhenTrackingLost && Time.time - lastSpotted > secondsLostUntilDisable)
             {
                 for (int i = 0; i < transform.childCount; i++)
                 {
@@ -146,23 +147,10 @@ namespace IRToolTrack
                 childrenActive = false;
             }
 
-
-            /*
-            //Delay Positioning by one frame to maybe make it smoother
-            if (lastUpdate == trackingTimestamp)
-            {
-                transform.position = targetPosition;
-                //transform.rotation = Quaternion.Lerp(targetRotation, transform.rotation, 0);
-            }
-            else
-            {
-                transform.position = Vector3.Lerp(targetPosition, transform.position, 0.5f);
-                //transform.rotation = Quaternion.Lerp(targetRotation, transform.rotation, 0.5f);
-            }
-            */
-            transform.position = targetPosition;
-            transform.rotation = targetRotation;
+            // Set Stylus To Depth Pose
+            this.StylusToDepth.transform.SetPositionAndRotation(targetPosition, targetRotation);
             lastUpdate = trackingTimestamp;
+
         }
     }
 }

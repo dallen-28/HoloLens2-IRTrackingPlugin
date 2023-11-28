@@ -18,6 +18,12 @@ public class IRToolTracking : MonoBehaviour
     private bool startToolTracking = false;
 
     private IRToolController[] tools = null;
+    public GameObject DepthToWorld;
+    public GameObject DepthImagePreview;
+    Texture2D DepthImagePreviewTexture;
+
+    private byte[] shortAbImageFrameData = null;
+
 
     public float[] GetToolTransform(string identifier)
     {
@@ -28,6 +34,16 @@ public class IRToolTracking : MonoBehaviour
         return toolTransform;
 
     }
+
+    public float[] GetDepthToWorldTransform()
+    {
+        var depthToWorldTransform = Enumerable.Repeat<float>(0, 8).ToArray();
+#if ENABLE_WINMD_SUPPORT
+        depthToWorldTransform = toolTracking.GetDepthToWorldTransform();        
+#endif
+        return depthToWorldTransform;
+    }
+
 
     public Int64 GetTimestamp()
     {
@@ -40,14 +56,56 @@ public class IRToolTracking : MonoBehaviour
 
     public void Start()
     {
+        DepthImagePreviewTexture = new Texture2D(512, 512, TextureFormat.Alpha8, false);
+        DepthImagePreview.GetComponent<MeshRenderer>().material.mainTexture = DepthImagePreviewTexture;
+
         //Find Tool Controllers and add them to the tracking
         tools = FindObjectsOfType<IRToolController>();
         StartToolTracking();
-    }
 
+
+    }
+    public void Update()
+    {
+      
+        float[] depthToWorldTransform = GetDepthToWorldTransform();
+        Quaternion quat = new Quaternion(depthToWorldTransform[3], depthToWorldTransform[4], depthToWorldTransform[5], depthToWorldTransform[6]);
+        Vector3 pos = new Vector3(depthToWorldTransform[0], depthToWorldTransform[1], depthToWorldTransform[2]);
+        DepthToWorld.transform.SetPositionAndRotation(pos, quat);
+
+        //byte[] data = new byte[] {255,0,0,255};
+
+        //DepthImagePreviewTexture.LoadRawTextureData(data);
+        //DepthImagePreviewTexture.Apply();
+
+
+#if ENABLE_WINMD_SUPPORT
+
+        // update short-throw AbImage texture --> active brightness image
+        if (toolTracking.ShortAbImageTextureUpdated())
+        {
+            byte[] frameTexture = toolTracking.GetShortAbImageTextureBuffer();
+            if (frameTexture.Length > 0)
+            {
+                if (shortAbImageFrameData == null)
+                {
+                    shortAbImageFrameData = frameTexture;
+                }
+                else
+                {
+                    System.Buffer.BlockCopy(frameTexture, 0, shortAbImageFrameData, 0, shortAbImageFrameData.Length);
+                }
+
+                DepthImagePreviewTexture.LoadRawTextureData(shortAbImageFrameData);
+                DepthImagePreviewTexture.Apply();
+            }
+        }
+#endif
+
+    }
     public void StartToolTracking()
     {
-            Debug.Log("Start Tracking");
+        Debug.Log("Start Tracking");
 #if ENABLE_WINMD_SUPPORT
         if (!startToolTracking){
             if (toolTracking == null)

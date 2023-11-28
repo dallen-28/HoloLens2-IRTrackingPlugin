@@ -56,6 +56,7 @@ namespace winrt::HL2IRToolTracking::implementation
         }
 
         this->m_depthToWorldPose = new float[7];
+        //this->m_shortAbImageTexture = new UINT8[262144];
 
         // get spatial locator of rigNode
         GUID guid;
@@ -220,6 +221,7 @@ namespace winrt::HL2IRToolTracking::implementation
                 size_t outBufferCount = 0;
                 const UINT16* pDepth = nullptr;
                 pDepthFrame->GetBuffer(&pDepth, &outBufferCount);
+                pHL2IRTracking->m_depthBufferSize = outBufferCount;
 
                 size_t outAbBufferCount = 0;
                 const UINT16* pAbImage = nullptr;
@@ -315,15 +317,6 @@ namespace winrt::HL2IRToolTracking::implementation
                             *pLutTable++ = xy[0];
                             *pLutTable++ = xy[1];
                             *pLutTable++ = z;
-
-                            // save AbImage as grayscale texture pixel into temp buffer
-                            auto idx = resolution.Width * y + x;
-                            UINT16 abValue = pAbImage[idx];
-                            uint8_t processedAbValue = 0;
-                            if (abValue > 1000) { processedAbValue = 0xFF; }
-                            else { processedAbValue = (uint8_t)((float)abValue / 1000 * 255); }
-                            pAbTexture.get()[idx] = processedAbValue;
-
                         }
                     }
                     OutputDebugString(L"Create Space for lut...\n");
@@ -332,16 +325,65 @@ namespace winrt::HL2IRToolTracking::implementation
                     pHL2IRTracking->m_lutLength_short = lutTable.size();
                     pHL2IRTracking->m_LUTGenerated_short = true;
                 }
+                else
+                {
+            
+                    for (size_t y = 0; y < resolution.Height; y++)
+                    {
+   
+                        for (size_t x = 0; x < resolution.Width; x++)
+                        {
+                            auto idx = resolution.Width * y + x;
+                            UINT16 depth = pDepth[idx];
+                            depth = (depth > 4090) ? 0 : depth - pHL2IRTracking->m_depthOffset;
 
+                            // save depth map as grayscale texture pixel into temp buffer
+                            if (depth == 0) { pDepthTexture.get()[idx] = 0; }
+                            else { pDepthTexture.get()[idx] = (uint8_t)((float)depth / 1000 * 255); }
+
+
+                            UINT16 abValue = pAbImage[idx];
+                            uint8_t processedAbValue = 0;
+                            if (abValue > 1000) { processedAbValue = 0xFF; }
+                            else { processedAbValue = (uint8_t)((float)abValue / 1000 * 255); }
+
+                            pAbTexture.get()[idx] = processedAbValue;
+
+                        }
+                    }
+                }
                 
+                // save pre-processed depth map texture (for visualization)
+                if (!pHL2IRTracking->m_depthMapTexture)
+                {
+                    OutputDebugString(L"Create Space for depth map texture...\n");
+                    pHL2IRTracking->m_depthMapTexture = new UINT8[outBufferCount];
+                }
+                memcpy(pHL2IRTracking->m_depthMapTexture, pDepthTexture.get(), outBufferCount * sizeof(UINT8));
+
                 // save pre-processed AbImage texture (for visualization)
                 if (!pHL2IRTracking->m_shortAbImageTexture)
                 {
                     OutputDebugString(L"Create Space for short AbImage texture...\n");
                     pHL2IRTracking->m_shortAbImageTexture = new UINT8[outBufferCount];
                 }
+                //std::string funcoutput = "ImageTextureSize = " + std::to_string(pAbTexture.get()[555]) + "\n";
+
+                //int randomNum = std::rand() % 262144;
+
+                //std::string funcoutput = "Test1 = " + std::to_string(pHL2IRTracking->m_test1[randomNum]) + "\n";
+                //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
                 memcpy(pHL2IRTracking->m_shortAbImageTexture, pAbTexture.get(), outBufferCount * sizeof(UINT8));
+
+              
+
+                //funcoutput = "ShortAbImageTexture = " + std::to_string(pHL2IRTracking->m_shortAbImageTexture[randomNum]) + "\n";
+                //OutputDebugString(std::wstring(funcoutput.begin(), funcoutput.end()).c_str());
+
                 pHL2IRTracking->m_shortAbImageTextureUpdated = true;
+
+
                 
 
                 // ------------------------------- Tool tracking start -------------------------------
@@ -564,7 +606,7 @@ namespace winrt::HL2IRToolTracking::implementation
 
         OutputDebugString(L"On Device Tracking Starting.\n");
 
-        return m_IRToolTracker->StartTracking();;
+        return m_IRToolTracker->StartTracking();
     }
 
     void HL2IRTracking::StopToolTracking()
@@ -626,10 +668,21 @@ namespace winrt::HL2IRToolTracking::implementation
 
     com_array<float> HL2IRTracking::GetDepthToWorldTransform()
     {
-
         com_array<float> pose = com_array<float>(std::move_iterator(m_depthToWorldPose), std::move_iterator(m_depthToWorldPose + 7)); 
         return pose;
+    }
 
+    // Get depth map texture buffer. (For visualization purpose)
+    com_array<uint8_t> HL2IRTracking::GetDepthMapTextureBuffer()
+    {
+        std::unique_lock<std::shared_mutex> l(mu);
+        if (!m_depthMapTexture)
+        {
+            return com_array<UINT8>();
+        }
+        com_array<UINT8> tempBuffer = com_array<UINT8>(std::move_iterator(m_depthMapTexture), std::move_iterator(m_depthMapTexture + m_depthBufferSize));
+;
+        return tempBuffer;
     }
 
     // Get depth map texture buffer. (For visualization purpose)
@@ -639,11 +692,12 @@ namespace winrt::HL2IRToolTracking::implementation
         
         if (!m_shortAbImageTexture)
         {
-            return com_array<UINT8>();
+            return com_array<uint8_t>();
         }
-        com_array<UINT8> tempBuffer = com_array<UINT8>(std::move_iterator(m_shortAbImageTexture), std::move_iterator(m_shortAbImageTexture + m_depthBufferSize));
+        com_array<uint8_t> tempBuffer = com_array<uint8_t>(std::move_iterator(m_shortAbImageTexture), std::move_iterator(m_shortAbImageTexture + m_depthBufferSize));
 
         m_shortAbImageTextureUpdated = false;
+
         return tempBuffer;
     }
 
